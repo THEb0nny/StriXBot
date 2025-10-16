@@ -4,6 +4,7 @@
 // https://github.com/GyverLibs/GTimer
 // https://github.com/GyverLibs/EncButton
 // https://github.com/GyverLibs/StringUtils
+// https://wiki.amperka.ru/products:openmv-cam-h7-plus
 
 #include <SoftwareSerial.h>
 #include <GyverMotor2.h>
@@ -58,7 +59,8 @@ void btnISR() {
 void setup() {
   Serial.begin(115200); // Инициализация скорости общения по монитору порта
   Serial.setTimeout(10); // Позволяет задать время ожидания данных, поступающих через последовательный интерфейс
-  OpenMVSerial.begin(115200); // Инициализация скорости общения с камерой
+  OpenMVSerial.begin(57600); // Инициализация скорости общения с камерой
+  OpenMVSerial.setTimeout(5);
   Serial.println();
   motorLeft.reverse(1); // Направление вращение левого мотора
   motorRight.reverse(0); // Направление вращения правого мотора
@@ -83,7 +85,7 @@ void setup() {
 
 void loop() {
   // CheckBtnClickToReset(); // Вызываем функцию опроса кнопки
-  ParseFromSerialInputValues(Serial, true); // Парсинг значений из Serial
+  ParseFromSerialInputValues(OpenMVSerial, true); // Парсинг значений из Serial
 
   if (regTmr.tick()) { // Раз в N мсек выполнять регулирование
     currTime = millis();
@@ -131,7 +133,8 @@ void CheckBtnClickToReset() {
 
 void ParseFromSerialInputValues(Stream& serial, bool debug) {
   static char input[64];
-  if (!serial.available()) return;
+
+  if (!serial.available()) return; // Проверяем, есть ли вообще данные
 
   int amount = serial.readBytesUntil(';', input, sizeof(input) - 1); // Читаем строку до ';'
   if (amount <= 0) return;
@@ -149,9 +152,12 @@ void ParseFromSerialInputValues(Stream& serial, bool debug) {
   Text t(input);
   t.trim();
 
+  // Пропускаем пустые строки
+  if (!t || t.length() == 0) return;
+
   if (debug) {
-    serial.print(F("RAW: "));
-    serial.println(t.str());
+    Serial.print(F("RAW: "));
+    Serial.println(t.str());
   }
 
   Text parts[12]; // Разделяем по запятым на отдельные пары "ключ:значение"
@@ -173,7 +179,7 @@ void ParseFromSerialInputValues(Stream& serial, bool debug) {
     tokens[1].trim().toStr(valBuf, sizeof(valBuf), true);
 
     if (debug) {
-      serial.println(String(F("key: [")) + keyBuf + F("], value: [") + valBuf + F("]"));
+      Serial.println(String(F("key: [")) + keyBuf + F("], value: [") + valBuf + F("]"));
     }
 
     // Обработка ключей — теперь надёжно
@@ -181,8 +187,8 @@ void ParseFromSerialInputValues(Stream& serial, bool debug) {
     else if (strcmp(keyBuf, "ki") == 0) pid.setKi(strToFloat(valBuf));
     else if (strcmp(keyBuf, "kd") == 0) pid.setKd(strToFloat(valBuf));
     else if (strcmp(keyBuf, "speed") == 0) speed = strToInt<int>(valBuf);
-    else if (strcmp(keyBuf, "error") == 0) error = strToInt<int>(valBuf);
+    else if (strcmp(keyBuf, "error") == 0) error = strToFloat(valBuf);
   }
 
-  if (debug) serial.println(F("PARSING DONE"));
+  if (debug) Serial.println(F("PARSING DONE"));
 }

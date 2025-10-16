@@ -16,7 +16,7 @@ ROIS = [
 weight_sum = sum(r[4] for r in ROIS)
 
 # --- UART ---
-uart = UART(3, 115200) # TX=P4, RX=P5
+uart = UART(3, 57600) # TX=P4, RX=P5
 
 # --- Инициализация камеры ---
 sensor.reset()
@@ -25,6 +25,7 @@ sensor.set_framesize(sensor.QQVGA)
 sensor.skip_frames(time=2000)
 sensor.set_auto_gain(False)
 sensor.set_auto_whitebal(False)
+
 clock = time.clock()
 
 # Центр кадра (для QQVGA 160x120)
@@ -64,13 +65,12 @@ while True:
         center_pos = centroid_sum / weight_sum
         error = center_pos - setpoint
         # Отправляем только ошибку (e)
-        uart.write("error:{:.2f}".format(error))
+        uart.write("error:{:.2f};\n".format(error))
 
         # Отладочный вывод OpenMV
-        # print("FPS: {:.2f} | Error: {:.2f} ".format(clock.fps(), error))
-        print("error:{:.2f}".format(error))
+        print("FPS: {:.2f}\terror: {:.2f} ".format(clock.fps(), error))
 
     else:
         # --- Передача "nan" при потере линии ---
-        uart.write("nan\n")
+        uart.write("nan;\n")
         # print("Line Lost")
