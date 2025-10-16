@@ -15,17 +15,8 @@ ROIS = [
 ]
 weight_sum = sum(r[4] for r in ROIS)
 
-# --- PID-параметры (подбираются экспериментально) ---
-Kp = 2.0
-Ki = 0.0
-Kd = 0.3
-
-# --- PID-переменные ---
-previous_error = 0
-integral = 0
-
 # --- UART ---
-uart = UART(3, 115200)  # TX=P4, RX=P5
+uart = UART(3, 115200) # TX=P4, RX=P5
 
 # --- Инициализация камеры ---
 sensor.reset()
@@ -72,21 +63,8 @@ while True:
     if line_found:
         center_pos = centroid_sum / weight_sum
         error = center_pos - setpoint
-
-        # --- PID ---
-        integral += error
-        integral = max(min(integral, 100), -100)  # анти-windup
-        derivative = error - previous_error
-        output = (Kp * error) + (Ki * integral) + (Kd * derivative)
-        previous_error = error
-
-        # --- Передача по UART ---
-        error = center_pos - setpoint
-
-        # --- Передача по UART ---
         # Отправляем только ошибку (e)
         uart.write("error:{:.2f}".format(error))
-
 
         # Отладочный вывод OpenMV
         # print("FPS: {:.2f} | Error: {:.2f} ".format(clock.fps(), error))

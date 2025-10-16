@@ -16,8 +16,8 @@ using namespace su;
 
 #define PRINT_DT_ERR_U_DEBUG false // Печать значений dt, error, и TRUE
 
-#define CAM_RX_PIN 2 // RX (Подключить к TX P4 OpenMV)
-#define CAM_TX_PIN 3 // TX (Подключить к RX P5 OpenMV, опционально)
+#define CAM_RX_PIN 8 // RX (Подключить к TX P4 OpenMV)
+#define CAM_TX_PIN 9 // TX (Подключить к RX P5 OpenMV)
 
 #define MOT_LEFT_IN1_PIN 6 // Пин управляющий направлением вращения левого мотора
 #define MOT_LEFT_IN2_PIN 7 // Пин управляющий направлением вращения левого мотора
@@ -27,7 +27,7 @@ using namespace su;
 #define MOT_RIGHT_IN2_PIN 5 // Пин управляющий направлением вращения правого мотора
 #define MOT_RIGHT_PWM_PIN 10 // Пин ШИМ правого мотора
 
-#define RESET_BTN_PIN 8 // Пин кнопки для старта, мягкого перезапуска
+#define RESET_BTN_PIN 2 // Пин кнопки для старта, мягкого перезапуска
 
 #define KP 1.0 // Стартовые значения KP pid регулятора
 #define KI 0 // Стартовые значения KI pid регулятора
