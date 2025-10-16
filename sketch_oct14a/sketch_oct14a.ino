@@ -15,7 +15,7 @@
 
 using namespace su;
 
-#define PRINT_DT_ERR_U_DEBUG false // Печать значений dt, error, и TRUE
+#define PRINT_DT_ERR_U_DEBUG 1 // Печать значений dt, error и u
 
 #define CAM_RX_PIN 8 // RX (Подключить к TX P4 OpenMV)
 #define CAM_TX_PIN 9 // TX (Подключить к RX P5 OpenMV)
@@ -53,38 +53,43 @@ void(* softResetFunc) (void) = 0; // Функция мягкого переза�
 
 void btnISR() {
   btn.pressISR(); // Функция сообщает библиотеке, что кнопка была нажата вне tick()
-  Serial.println("Press");
+  Serial.println("SOFT RESET");
+  Serial.flush(); // Дождаться отправки всех данных по UART
+  softResetFunc();
 }
 
 void setup() {
-  Serial.begin(115200); // Инициализация скорости общения по монитору порта
-  Serial.setTimeout(10); // Позволяет задать время ожидания данных, поступающих через последовательный интерфейс
+  Serial.begin(57600); // Инициализация скорости общения по монитору порта
+  Serial.setTimeout(10); // Задаёт время ожидания данных, поступающих через последовательный интерфейс
   OpenMVSerial.begin(57600); // Инициализация скорости общения с камерой
   OpenMVSerial.setTimeout(5);
   Serial.println();
+  if (Serial) Serial.println("STARTS...");
   motorLeft.reverse(1); // Направление вращение левого мотора
   motorRight.reverse(0); // Направление вращения правого мотора
   motorLeft.setMinDuty(10); // Минимальный сигнал (по модулю), который будет подан на левый мотор
   motorRight.setMinDuty(10); // Минимальный сигнал (по модулю), который будет подан на правый мотор
-  pid.setKp(KP); pid.setKi(KI); pid.setKd(KD); // Установка стартовых значений пид регулятора
+  pid.setKp(KP); // Установка стартовых значений пид регулятора
+  pid.setKi(KI);
+  pid.setKd(KD);
   pid.outMin = -255; // Нижний предел регулирования
   pid.outMax = 255; // Верхний предел регулирования
   pid.setDt(dt);
   regTmr.setMode(GTMode::Interval); // Настроем режим таймера регулирования на интервал
   regTmr.setTime(dt);
-  // attachInterrupt(0, btnISR, FALLING); // Назначит прерывание на кнопку
   while (millis() < 250); // Время после старта для возможности запуска, защита от перезагрузки и старта кода сразу
-  Serial.println("Ready... press btn to start");
+  if (Serial) Serial.println("Ready... press btn to run");
   PauseUntilBtnPressed(); // Ждём нажатия для старта
-  Serial.println("Start!");
+  EIFR = (1 << digitalPinToInterrupt(RESET_BTN_PIN)); // Очищаем флаг прерывания, иначе сработает прерывание и будет перезагрузка
+  delay(50); // Антидребезг перед активацией прерывания
+  attachInterrupt(digitalPinToInterrupt(RESET_BTN_PIN), btnISR, FALLING); // Назначит прерывание на кнопку
+  if (Serial) Serial.println("Run!");
   regTmr.start(); // Запускаем таймер цикла регулирования
   // Записываем время перед стартом loop
-  currTime = millis();
-  prevTime = currTime;
+  prevTime = millis();
 }
 
 void loop() {
-  // CheckBtnClickToReset(); // Вызываем функцию опроса кнопки
   ParseFromSerialInputValues(OpenMVSerial, true); // Парсинг значений из Serial
 
   if (regTmr.tick()) { // Раз в N мсек выполнять регулирование
@@ -99,7 +104,7 @@ void loop() {
     MotorsControl(u, speed); // Для управления моторами регулятором
     
     // Для отладки основной информации о регулировании
-    if (PRINT_DT_ERR_U_DEBUG) {
+    if (Serial && PRINT_DT_ERR_U_DEBUG) {
       Serial.println("dt: " + String(dt) + "\terror: " + String(error) + "\tu: " + String(u));
     }
   }
@@ -117,17 +122,7 @@ void MotorsControl(float dir, int speed) {
 void PauseUntilBtnPressed() {
   while (true) { // Ждём нажатие кнопки для старта
     btn.tick(); // Опрашиваем кнопку
-    if (btn.press()) break; // Произошло нажатие
-  }
-}
-
-// Функция опроса о нажатии кнопки
-void CheckBtnClickToReset() {
-  btn.tick(); // Опрашиваем кнопку в первый раз
-  if (btn.press()) { // Произошло нажатие
-    Serial.println("Btn press and reset");
-    delay(50); // Нужна задержка иначе не выведет сообщение
-    softResetFunc(); // Если клавиша нажата, то сделаем мягкую перезагрузку
+    if (btn.release()) break; // Произошло нажатие
   }
 }
 
@@ -171,14 +166,12 @@ void ParseFromSerialInputValues(Stream& serial, bool debug) {
     uint16_t tokenCount = pair.split(tokens, 2, ':'); // ':' — разделитель ключ/значение
     if (tokenCount < 2) continue;
 
-    // локальные буферы — безопасно, размер подбирай по нуждам
-    char keyBuf[24], valBuf[24];
-
+    char keyBuf[24], valBuf[24]; // Локальные буферы — безопасно, размер подбирай по нуждам
     // Скопировать токены в буферы и гарантировать '\0'
     tokens[0].trim().toStr(keyBuf, sizeof(keyBuf), true); // true — гарантировать терминацию
     tokens[1].trim().toStr(valBuf, sizeof(valBuf), true);
 
-    if (debug) {
+    if (Serial && debug) {
       Serial.println(String(F("key: [")) + keyBuf + F("], value: [") + valBuf + F("]"));
     }
 
@@ -190,5 +183,5 @@ void ParseFromSerialInputValues(Stream& serial, bool debug) {
     else if (strcmp(keyBuf, "error") == 0) error = strToFloat(valBuf);
   }
 
-  if (debug) Serial.println(F("PARSING DONE"));
+  if (Serial && debug) Serial.println(F("PARSING DONE"));
 }
