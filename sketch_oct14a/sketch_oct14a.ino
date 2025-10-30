@@ -21,8 +21,8 @@ using namespace su;
 #define CAM_RX_PIN 12 // RX (подключить к TX P4 OpenMV)
 #define CAM_TX_PIN 11 // TX (подключить к RX P5 OpenMV)
 
-#define BT_RX_PIN 6 // RX блютуза
-#define BT_TX_PIN 10 // TX блютуза
+#define BT_RX_PIN 10 // RX блютуза
+#define BT_TX_PIN 6 // TX блютуза
 
 #define MOT_LEFT_IN1_PIN 7 // Пин управляющий направлением вращения левого мотора
 #define MOT_LEFT_IN2_PIN 8 // Пин управляющий направлением вращения левого мотора
@@ -39,7 +39,7 @@ using namespace su;
 #define KD 0 // Стартовые значения KD pid регулятора
 
 SoftwareSerial OpenMVSerial(CAM_RX_PIN, CAM_TX_PIN);
-SoftwareSerial BTSerial(BT_RX_PIN, BT_TX_PIN);
+// SoftwareSerial BTSerial(BT_RX_PIN, BT_TX_PIN);
 
 uPID pid(D_INPUT | I_SATURATE); // Инициализируем регулятор и устанавливаем коэффициенты регулятора
 GTimer<millis> regTmr;  // Инициализация объекта таймера цикла регулирования в нужном количестве мс
@@ -68,8 +68,8 @@ void setup() {
   Serial.setTimeout(10); // Задаёт время ожидания данных, поступающих через последовательный интерфейс
   OpenMVSerial.begin(57600); // Инициализация скорости общения с камерой
   OpenMVSerial.setTimeout(5);
-  BTSerial.begin(57600); // Инициализация скорости общения с блютузом
-  BTSerial.setTimeout(5);
+  // BTSerial.begin(57600); // Инициализация скорости общения с блютузом
+  // BTSerial.setTimeout(5);
   Serial.println();
   if (Serial) Serial.println("STARTS...");
   motorLeft.reverse(1); // Направление вращение левого мотора
@@ -100,7 +100,7 @@ void setup() {
 
 void loop() {
   ParseFromSerialInputValues(OpenMVSerial, true); // Парсинг значений из Serial
-  ParseFromSerialInputValues(BTSerial, true); // Парсинг значений из Serial
+  // ParseFromSerialInputValues(BTSerial, true); // Парсинг значений из Serial
 
   if (regTmr.tick()) { // Раз в N мсек выполнять регулирование
     currTime = millis();
@@ -191,8 +191,8 @@ void ParseFromSerialInputValues(Stream& serial, bool debug) {
     if (strcmp(keyBuf, "kp") == 0) pid.setKp(strToFloat(valBuf));
     else if (strcmp(keyBuf, "ki") == 0) pid.setKi(strToFloat(valBuf));
     else if (strcmp(keyBuf, "kd") == 0) pid.setKd(strToFloat(valBuf));
-    else if (strcmp(keyBuf, "speed") == 0) speed = strToInt<int>(valBuf);
-    else if (strcmp(keyBuf, "error") == 0) error = strToFloat(valBuf);
+    else if (strcmp(keyBuf, "s") == 0) speed = strToInt<int>(valBuf);
+    else if (strcmp(keyBuf, "e") == 0) error = strToFloat(valBuf);
   }
 
   if (Serial && debug) Serial.println(F("PARSING DONE"));
