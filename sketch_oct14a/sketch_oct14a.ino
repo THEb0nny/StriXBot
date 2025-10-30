@@ -16,17 +16,21 @@
 using namespace su;
 
 #define PRINT_DT_ERR_U_DEBUG 1 // Печать значений dt, error и u
+#define MOTORS_WORK 1 // Работа моторов
 
-#define CAM_RX_PIN 8 // RX (Подключить к TX P4 OpenMV)
-#define CAM_TX_PIN 9 // TX (Подключить к RX P5 OpenMV)
+#define CAM_RX_PIN 12 // RX (подключить к TX P4 OpenMV)
+#define CAM_TX_PIN 11 // TX (подключить к RX P5 OpenMV)
 
-#define MOT_LEFT_IN1_PIN 6 // Пин управляющий направлением вращения левого мотора
-#define MOT_LEFT_IN2_PIN 7 // Пин управляющий направлением вращения левого мотора
-#define MOT_LEFT_PWM_PIN 11 // Пин ШИМ левого мотора
+#define BT_RX_PIN 6 // RX блютуза
+#define BT_TX_PIN 10 // TX блютуза
+
+#define MOT_LEFT_IN1_PIN 7 // Пин управляющий направлением вращения левого мотора
+#define MOT_LEFT_IN2_PIN 8 // Пин управляющий направлением вращения левого мотора
+#define MOT_LEFT_PWM_PIN 9 // Пин ШИМ левого мотора
 
 #define MOT_RIGHT_IN1_PIN 4 // Пин управляющий направлением вращения правого мотора
 #define MOT_RIGHT_IN2_PIN 5 // Пин управляющий направлением вращения правого мотора
-#define MOT_RIGHT_PWM_PIN 10 // Пин ШИМ правого мотора
+#define MOT_RIGHT_PWM_PIN 3 // Пин ШИМ правого мотора
 
 #define RESET_BTN_PIN 2 // Пин кнопки для старта, мягкого перезапуска
 
@@ -35,6 +39,7 @@ using namespace su;
 #define KD 0 // Стартовые значения KD pid регулятора
 
 SoftwareSerial OpenMVSerial(CAM_RX_PIN, CAM_TX_PIN);
+SoftwareSerial BTSerial(BT_RX_PIN, BT_TX_PIN);
 
 uPID pid(D_INPUT | I_SATURATE); // Инициализируем регулятор и устанавливаем коэффициенты регулятора
 GTimer<millis> regTmr;  // Инициализация объекта таймера цикла регулирования в нужном количестве мс
@@ -46,7 +51,7 @@ GMotor2<DRIVER3WIRE> motorRight(MOT_RIGHT_IN1_PIN, MOT_RIGHT_IN2_PIN, MOT_RIGHT_
 unsigned long currTime, prevTime; // Время
 int dt = 10; // Время
 
-int speed = 128; // Инициализируем переменную скорости
+int speed = 100; // Инициализируем переменную скорости
 float error = 0; // Ошибка регулирования
 
 void(* softResetFunc) (void) = 0; // Функция мягкого перезапуска
@@ -63,12 +68,16 @@ void setup() {
   Serial.setTimeout(10); // Задаёт время ожидания данных, поступающих через последовательный интерфейс
   OpenMVSerial.begin(57600); // Инициализация скорости общения с камерой
   OpenMVSerial.setTimeout(5);
+  BTSerial.begin(57600); // Инициализация скорости общения с блютузом
+  BTSerial.setTimeout(5);
   Serial.println();
   if (Serial) Serial.println("STARTS...");
   motorLeft.reverse(1); // Направление вращение левого мотора
-  motorRight.reverse(0); // Направление вращения правого мотора
+  motorRight.reverse(1); // Направление вращения правого мотора
   motorLeft.setMinDuty(10); // Минимальный сигнал (по модулю), который будет подан на левый мотор
   motorRight.setMinDuty(10); // Минимальный сигнал (по модулю), который будет подан на правый мотор
+  motorLeft.setDeadtime(5); // Установить deadtime в микросекундах
+  motorRight.setDeadtime(5); // Установить deadtime в микросекундах
   pid.setKp(KP); // Установка стартовых значений пид регулятора
   pid.setKi(KI);
   pid.setKd(KD);
@@ -91,6 +100,7 @@ void setup() {
 
 void loop() {
   ParseFromSerialInputValues(OpenMVSerial, true); // Парсинг значений из Serial
+  ParseFromSerialInputValues(BTSerial, true); // Парсинг значений из Serial
 
   if (regTmr.tick()) { // Раз в N мсек выполнять регулирование
     currTime = millis();
@@ -101,7 +111,7 @@ void loop() {
     pid.setDt(dt); // Установка dt для регулятора
     float u = pid.compute(0); // Управляющее воздействие с регулятора
 
-    MotorsControl(u, speed); // Для управления моторами регулятором
+    if (MOTORS_WORK) MotorsControl(u, speed); // Для управления моторами регулятором
     
     // Для отладки основной информации о регулировании
     if (Serial && PRINT_DT_ERR_U_DEBUG) {
@@ -119,6 +129,7 @@ void MotorsControl(float dir, int speed) {
   motorRight.setSpeed(rMotorSpeed);
 }
 
+// Ждать нажатия
 void PauseUntilBtnPressed() {
   while (true) { // Ждём нажатие кнопки для старта
     btn.tick(); // Опрашиваем кнопку
@@ -126,6 +137,7 @@ void PauseUntilBtnPressed() {
   }
 }
 
+// Парсинг входящих по Serial значений
 void ParseFromSerialInputValues(Stream& serial, bool debug) {
   static char input[64];
 
